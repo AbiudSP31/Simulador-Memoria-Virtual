@@ -2,7 +2,11 @@ import java.lang.Thread;
 import java.io.*;
 import java.util.*;
 //import Page;
-
+/*Notas del Parche
+se agrago un Vector que contiene nuestros elementos
+desde el archivo memry.conf se establecen las direcciones finales e iniciales del segmento (los segmentos deben ir ordenados)
+se asigna a cada pagina en que segmento se encuentra
+*/
 public class Kernel extends Thread
 {
   // The number of virtual pages must be fixed at 63 due to
@@ -16,6 +20,7 @@ public class Kernel extends Thread
   private String config_file;
   private ControlPanel controlPanel ;
   private Vector memVector = new Vector();
+  private Vector segmVector = new Vector();
   private Vector instructVector = new Vector();
   private String status;
   private boolean doStdoutLog = false;
@@ -24,21 +29,10 @@ public class Kernel extends Thread
   public int runcycles;
   public long block = (int) Math.pow(2,12);
   public static byte addressradix = 10;
-  public segmento s[]=new segmento[5];
-
-  public int getSegmento(Page p){
-
-  }
-
+  public int sindex=0;
+  public boolean instrError=false;
   public void init( String commands , String config )  
   {
-    
-    s[0]=new segmento(0000,27fff);
-    s[1]=new segmento(28000,3bfff);
-    s[2]=new segmento(3c000,4ffff);
-    s[3]=new segmento(50000,67fff);
-    s[4]=new segmento(68000,7ffff);
-    
     File f = new File( commands );
     command_file = commands;
     config_file = config;
@@ -91,7 +85,7 @@ public class Kernel extends Thread
       {
         high = (block * (i + 1))-1;
         low = block * i;
-        memVector.addElement(new Page(i, -1, R, M, 0, 0, high, low));
+        memVector.addElement(new Page(i, -1, R, M, 0, 0, high, low,0));
       }
       try 
       {
@@ -99,6 +93,19 @@ public class Kernel extends Thread
         while ((line = in.readLine()) != null) 
 
         {
+          if (line.startsWith("segment")){
+            StringTokenizer st = new StringTokenizer(line);
+            st.nextToken();
+            while (st.hasMoreTokens()){
+              long dir1=Long.parseLong(st.nextToken(),16);
+              long dir2=Long.parseLong(st.nextToken(),16);
+              Segment seg=new Segment(dir1,dir2,sindex);
+              sindex++;
+              segmVector.add(seg);
+              System.out.println(seg.dir_ini+"--"+seg.dir_fin+"-"+seg.index);
+            } 
+
+          }
           if (line.startsWith("memset")) 
           { 
             StringTokenizer st = new StringTokenizer(line);
@@ -229,7 +236,21 @@ public class Kernel extends Thread
           }
         }
         in.close();
+
       } catch (IOException e) { /* Handle exceptions */ }
+      int auxseg=-1;
+  	  for (i = 0; i <= virtPageNum; i++) 
+      {
+      	Page page = (Page) memVector.elementAt(i);
+      	for(int k=0;k<sindex;k++){
+      		Segment auxs= (Segment) segmVector.elementAt(k);
+      		 auxseg=auxs.is_in(page.low,page.high);
+      		if(auxseg>=0)
+      			break;
+      	}
+      	page.segment=auxseg;
+        
+      }
     }
     f = new File ( commands );
     try 
@@ -252,10 +273,24 @@ public class Kernel extends Thread
           tmp = st.nextToken();
           if (tmp.startsWith("random")) 
           {
-            instructVector.addElement(new Instruction(command,Common.randomLong( address_limit )));
+          	int foundSegm=0;
+          	long segm=Common.randomLong( address_limit);
+          	for (int l=0;l<sindex;l++ ) {
+          		Segment aux=(Segment)(segmVector.elementAt(l));
+          		if(aux.is_in(segm)!=-1){
+          			foundSegm=aux.is_in(segm);
+          		}
+
+          	}
+            instructVector.addElement(new Instruction(command,segm,foundSegm));
           } 
           else 
           { 
+          	//lee la instruccion del segmento
+          	int auxSegm=Integer.parseInt(tmp);
+          	System.out.println("tmp1: "+auxSegm+"---");
+          	tmp=st.nextToken();
+          	System.out.println("tmp: "+tmp+"---");
             if ( tmp.startsWith( "bin" ) )
             {
               addr = Long.parseLong(st.nextToken(),2);             
@@ -277,9 +312,10 @@ public class Kernel extends Thread
               System.out.println("MemoryManagement: " + addr + ", Address out of range in " + commands);
               System.exit(-1);
             }
-            instructVector.addElement(new Instruction(command,addr));
+          	System.out.println("ins"+command+" "+addr+" "+auxSegm);
+            instructVector.addElement(new Instruction(command,addr,auxSegm));
           }
-        }
+          		}
       }
       in.close();
     } catch (IOException e) { /* Handle exceptions */ }
@@ -361,7 +397,7 @@ public class Kernel extends Thread
   public void getPage(int pageNum) 
   {
     Page page = ( Page ) memVector.elementAt( pageNum );
-    controlPanel.paintPage( page );
+    controlPanel.paintPage( page,instrError);
   }
 
   private void printLogFile(String message)
@@ -422,7 +458,7 @@ public class Kernel extends Thread
     Instruction instruct = ( Instruction ) instructVector.elementAt( runs );
     controlPanel.instructionValueLabel.setText( instruct.inst );
     controlPanel.addressValueLabel.setText( Long.toString( instruct.addr , addressradix ) );
-    getPage( Virtual2Physical.pageNum( instruct.addr , virtPageNum , block ) );
+    //getPage( Virtual2Physical.pageNum( instruct.addr , virtPageNum , block ) );
     if ( controlPanel.pageFaultValueLabel.getText() == "YES" ) 
     {
       controlPanel.pageFaultValueLabel.setText( "NO" );
@@ -456,6 +492,14 @@ public class Kernel extends Thread
           System.out.println( "READ " + Long.toString( instruct.addr , addressradix ) + " ... okay" );
         }
       }
+      if(page.segment==instruct.addrSeg){
+      	instrError=true;
+      }
+      else{
+		instrError=false;
+      }
+
+      
     }
     if ( instruct.inst.startsWith( "WRITE" ) ) 
     {
@@ -485,14 +529,21 @@ public class Kernel extends Thread
           System.out.println( "WRITE " + Long.toString(instruct.addr , addressradix) + " ... okay" );
         }
       }
+      if(page.segment==instruct.addrSeg){
+      	instrError=true;
+      }
+      else{
+		instrError=false;
+      }
+
     }
     for ( i = 0; i < virtPageNum; i++ ) 
     {
       Page page = ( Page ) memVector.elementAt( i );
-      /*if ( page.R == 1 && page.lastTouchTime == 10 ) 
+      if ( page.R == 1 && page.lastTouchTime == 10 ) 
       {
-        page.R = 0;
-      }*/
+        //page.R = 0;
+      }
       if ( page.physical != -1 ) 
       {
         page.inMemTime = page.inMemTime + 10;
@@ -500,10 +551,12 @@ public class Kernel extends Thread
       }
     }
     runs++;
+    getPage( Virtual2Physical.pageNum( instruct.addr , virtPageNum , block ) );
     controlPanel.timeValueLabel.setText( Integer.toString( runs*10 ) + " (ns)" );
   }
 
   public void reset() {
+  	sindex=0;
     memVector.removeAllElements();
     instructVector.removeAllElements();
     controlPanel.statusValueLabel.setText( "STOP" ) ;

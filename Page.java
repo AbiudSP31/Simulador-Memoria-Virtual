@@ -8,8 +8,9 @@ public class Page
   public int lastTouchTime;
   public long high;
   public long low;
+  public int segment; // se agrego el atributo segemento
 
-  public Page( int id, int physical, byte R, byte M, int inMemTime, int lastTouchTime, long high, long low ) 
+  public Page( int id, int physical, byte R, byte M, int inMemTime, int lastTouchTime, long high, long low,int segment ) 
   {
     this.id = id;
     this.physical = physical;
@@ -19,6 +20,7 @@ public class Page
     this.lastTouchTime = lastTouchTime;
     this.high = high;
     this.low = low;
+    this.segment=segment;
   } 	
 
 }
