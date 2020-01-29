@@ -1,6 +1,6 @@
 import java.applet.*;
 import java.awt.*;
-
+//SE agrego los labels del segemento y se modifico el metodo paint page estos cambios se en las lineas 625 963 553 y 88
 public class ControlPanel extends Frame 
 {
   Kernel kernel ;
@@ -85,6 +85,7 @@ public class ControlPanel extends Frame
   Label lastTouchTimeValueLabel = new Label("0" , Label.LEFT) ;
   Label lowValueLabel = new Label("0" , Label.LEFT) ;
   Label highValueLabel = new Label("0" , Label.LEFT) ;
+  Label segmentLabel = new Label("0" , Label.LEFT) ;
   Label l0 = new Label(null, Label.CENTER);
   Label l1 = new Label(null, Label.CENTER);
   Label l2 = new Label(null, Label.CENTER);
@@ -149,8 +150,11 @@ public class ControlPanel extends Frame
   Label l61 = new Label(null, Label.CENTER);
   Label l62 = new Label(null, Label.CENTER);
   Label l63 = new Label(null, Label.CENTER);
+  Label segmentError= new Label("SegmentoCommands:",Label.LEFT);
+  Label segmentErrorAns= new Label("0",Label.LEFT);
 
   public ControlPanel() 
+
   {
     super();
   }
@@ -549,6 +553,15 @@ public class ControlPanel extends Frame
     highValueLabel.reshape( 395,225+25,230,15 );
     add( highValueLabel );
 
+    segmentLabel.reshape( 395,240+25,230,15 );
+    add( segmentLabel );
+
+    segmentError.reshape(395,255+25,230,15);
+    add(segmentError);
+
+    segmentErrorAns.reshape(395,270+25,230,15);
+    add(segmentErrorAns);
+
     Label virtualOneLabel = new Label( "virtual" , Label.CENTER) ;
     virtualOneLabel.reshape(0,15+25,70,15); 
     add(virtualOneLabel);
@@ -616,6 +629,10 @@ public class ControlPanel extends Frame
     Label highLabel = new Label("high: " , Label.LEFT) ;
     highLabel.reshape(285,225+25,110,15);
     add(highLabel);
+
+     Label segLabel = new Label("Segment: " , Label.LEFT) ;
+    segLabel.reshape(285,240+25,110,15);
+    add(segLabel);
 
     l0.reshape( 70, (2)*15+25, 60, 15 );
     l0.setForeground( Color.red );
@@ -943,7 +960,7 @@ public class ControlPanel extends Frame
     show();
   }
 
-  public void paintPage( Page page ) 
+  public void paintPage( Page page, Boolean error ) 
   {
     virtualPageValueLabel.setText( Integer.toString( page.id ) );
     physicalPageValueLabel.setText( Integer.toString( page.physical ) );
@@ -953,6 +970,11 @@ public class ControlPanel extends Frame
     lastTouchTimeValueLabel.setText( Integer.toString( page.lastTouchTime ) );
     lowValueLabel.setText(Long.toString( page.low , Kernel.addressradix ) );
     highValueLabel.setText(Long.toString( page.high , Kernel.addressradix ) );
+    segmentLabel.setText(Integer.toString( page.segment));
+    if(error)
+      segmentErrorAns.setText("S"+Integer.toString( page.segment)+"p"+Integer.toString( page.id ));
+    else
+      segmentErrorAns.setText("ERROR");
   }
 
   public void setStatus(String status) {
